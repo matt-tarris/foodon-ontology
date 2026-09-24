@@ -162,7 +162,18 @@ function formHTML(act, prefill) {
       <button class="btn" type="button" data-cancel>Cancel</button></div></form>`;
 }
 
+// A read-only deployment refuses writes at the server, but a button that looks live
+// and then fails is worse than one that is plainly disabled: on a hosted build every
+// approve would 403 AFTER the reviewer had made the decision.
+function readOnly() { return !!(DATA && DATA.read_only); }
+
 async function send(action, payload, msgEl) {
+  if (readOnly()) {
+    if (msgEl) msgEl.textContent = "read-only deployment \u2014 sign decisions locally";
+    return banner("warn", "This deployment is read-only. Decisions are signed in a "
+                          + "local checkout, where the files they write are under "
+                          + "review and under git.");
+  }
   if (BUSY) return;
   BUSY = true;
   banner("ok", "saving and regenerating…");
@@ -599,6 +610,10 @@ function renderIngredients() {
 }
 
 async function reviewBatch(action) {
+  if (readOnly()) {
+    return banner("warn", "This deployment is read-only \u2014 the queue is visible, "
+                          + "but approving is a local action.");
+  }
   const terms = [...SEL];
   if (!terms.length) return;
   banner("ok", `${action === "approve" ? "signing off" : "declining"} ${terms.length}…`);
@@ -670,5 +685,11 @@ fetch("/api/audit").then(r => r.json()).then(async (d) => {
   const h = await (await fetch("/api/health")).json().catch(() => ({}));
   DATA.claim_types = h.claim_types || {contains:1, may_contain:1, shared_compound:1,
                                        cross_reactive:1, disputed:1, not_avoidance_relevant:1};
+  if (DATA.read_only) {
+    document.body.classList.add("read-only");
+    banner("warn", "Read-only deployment. Every decision and the whole review queue are "
+                 + "here to read; signing one is a local action, because the files it "
+                 + "writes belong under review and under git.");
+  }
   render();
 });

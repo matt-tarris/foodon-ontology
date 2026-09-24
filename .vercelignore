@@ -1,0 +1,21 @@
+# Vercel falls back to .gitignore when this file is absent, and data/index.json IS
+# gitignored -- it is a 16 MB derived artefact. Without this the deployment would go up
+# with no index and fail at import, so the four files the server reads at runtime are
+# named back in below.
+.git
+ontology/
+tools/
+test/
+audit/
+dist/
+build_pyi/
+.buildenv
+package/
+data/
+!data/index.json
+!data/mined-classified.json
+!data/repairs-classified.json
+!data/resolution-store.json
+__pycache__/
+*.pyc
+.DS_Store

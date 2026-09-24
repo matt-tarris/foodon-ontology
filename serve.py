@@ -33,6 +33,20 @@ print(f"ready in {time.time()-_t:.1f}s  "
 # it -- an edit there is a decision nobody signed. Gated at the server, not by hiding a
 # link, because the audit page is reached by typing its URL and nothing else.
 EXPLORE_ONLY = os.environ.get("FOODON_EXPLORE_ONLY") == "1"
+# Read-only is a WEAKER gate than explore-only and exists for a different deployment.
+# The .app hides the audit layer completely; a hosted build shows it -- the queue and
+# every signed decision are the most interesting thing here -- but must not let anyone
+# write. It cannot let anyone write even if we wanted to: Vercel's filesystem is
+# read-only apart from /tmp, and /tmp does not survive between invocations, so an
+# approval would either fail or, far worse, appear to succeed and vanish.
+#
+# /api/audit/preview is a POST that writes nothing -- it reports what an edit WOULD do
+# -- so it stays. Everything else that POSTs is a write and does not.
+READ_ONLY = os.environ.get("FOODON_READ_ONLY") == "1"
+_NO_WRITE = {"error": "This is a read-only deployment. Decisions are signed in a local "
+                      "checkout, where the files they write are under review and under "
+                      "git; a hosted filesystem keeps neither.",
+             "read_only": True}
 _READ_ONLY = {"error": "This build is explore-only. The audit interface, which edits "
                        "the signed decision files, is not included.",
               "explore_only": True}
@@ -59,7 +73,8 @@ def reload_graph():
 def audit_data():
     if _audit["data"] is None:
         _audit["data"] = audit_model.build(full=GRAPH)
-    return dict(_audit["data"], sparql_stale=_audit["sparql_stale"], log=_audit["log"])
+    return dict(_audit["data"], sparql_stale=_audit["sparql_stale"], log=_audit["log"],
+                read_only=READ_ONLY)
 
 def annotations_for(roots):
     """Signed claims that are deliberately NOT edges in the graph.
@@ -161,6 +176,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if EXPLORE_ONLY:
             return self._send(_READ_ONLY, 403)
+        if READ_ONLY and parsed.path != "/api/audit/preview":
+            return self._send(_NO_WRITE, 403)
         if parsed.path == "/api/audit/preview":
             # accepts either shape: a statement (subject/predicate/object) or an
             # override (target_class/claim/query_roots). The second is the one that
@@ -237,6 +254,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if parsed.path == "/api/health":
             return self._send({
                 "ok": True,
+                "read_only": READ_ONLY,
+                "explore_only": EXPLORE_ONLY,
                 "classes": len(GRAPH.N),
                 "foodon_version": GRAPH.meta["version"],
                 "claim_types": GRAPH.overrides.get("claim_types") or {},

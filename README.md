@@ -380,6 +380,7 @@ python3 test/audit_run.py       # 97 assertions: the audit UI's read/write model
 python3 test/ingest_run.py      # 87 assertions: recipe line -> class, or nothing
 python3 test/decisions_run.py   # every IRI in every decision file still names that class
 python3 test/oracle_run.py      # 30 assertions: the outside-corpus comparison is honest
+python3 test/readonly_run.py    # 12 assertions: a hosted build cannot write
 
 python3 build/audit/probe.py    # the one-off discovery scripts; see build/audit/README.md
 ```
@@ -1504,6 +1505,48 @@ The headline number is not 77.4% or 53.4% but **fully-mapped items: 11.4% of rec
 and 10.0% of products.** One unmapped ingredient quarantines the whole item, because a
 recipe cannot be cleared for someone with an allergy on the strength of the ingredients
 that happened to resolve.
+
+## Hosting it: read-only, behind a password
+
+`vercel.json` and `api/index.py` deploy the server to Vercel. What goes up is **not**
+the local app, and three of the differences are forced rather than configured.
+
+**It cannot write, so it does not pretend to.** Vercel's filesystem is read-only apart
+from `/tmp`, and `/tmp` does not survive between invocations. An approval would fail,
+or — far worse — appear to succeed and vanish. `FOODON_READ_ONLY=1` refuses every
+writing endpoint at the server with a 403 that says why, and `audit.js` disables the
+controls when `/api/audit` reports the flag, because a button that looks live and then
+fails is worse than one that is plainly inert. `test/readonly_run.py` asserts this over
+real HTTP against a real server, since the UI half is a courtesy and anyone can POST.
+
+Read-only is **weaker** than the `.app`'s explore-only, on purpose. The `.app` hides the
+audit layer; a hosted build shows it, because the queue and the signed decisions are
+the most interesting thing here. `/api/audit/preview` is the one POST that survives: it
+reports what an edit *would* do and writes nothing, and it is what stops a wrong IRI
+landing.
+
+**Everything goes through the function, static files included.** Routing `web/` to
+Vercel's static hosting would serve `app.js` and `audit.html` to anyone with the URL and
+guard only the API. The auth check has to sit in front of everything or it guards
+nothing.
+
+**It fails closed.** With no `FOODON_PASSWORD` set, every request is refused. An auth
+check that falls open when misconfigured is worse than none, because it looks like one.
+
+```bash
+vercel                                    # first deploy: creates the project
+vercel env add FOODON_PASSWORD production # then set the password
+vercel --prod                             # and redeploy with it
+```
+
+**Deploy from the CLI, not by connecting the repo.** `data/index.json` is 16 MB of
+derived artefact and is gitignored, so a git-triggered build would go up with no index
+and fail at import. `.vercelignore` exists to name those four runtime files back in —
+Vercel falls back to `.gitignore` when it is absent, which is exactly the wrong
+behaviour here.
+
+Cold start is not a concern: `json.load` of the index is 0.06s and the whole `Resolver`
+builds in 0.15s, so a cold invocation pays a sixth of a second. The bundle is 17 MB.
 
 ## Shipping it to someone without a checkout
 

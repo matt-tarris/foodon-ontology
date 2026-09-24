@@ -149,3 +149,11 @@ table.ing tr.sel:hover td{background:#f8f2e8}
 .opt .how{color:#a8a49c;font-size:11px;margin-left:auto;white-space:nowrap}
 .opt .rec{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#2c6e49;
           background:#f2f9f5;border:1px solid #bcdccb;border-radius:20px;padding:1px 6px}
+
+/* Read-only deployment: the queue and every decision stay readable, and everything
+   that would write is visibly inert rather than live-until-it-fails. */
+body.read-only button[data-act],
+body.read-only .row-actions button,
+body.read-only #rebuild,
+body.read-only .batch-actions button { opacity: .38; pointer-events: none; }
+body.read-only .banner.warn { border-left: 3px solid #b8860b; }
