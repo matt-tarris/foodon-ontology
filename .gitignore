@@ -42,3 +42,4 @@ dist/
 build_pyi/
 .buildenv
 data/validation-cache/
+.vercel

@@ -1,7 +1,11 @@
-# Vercel falls back to .gitignore when this file is absent, and data/index.json IS
-# gitignored -- it is a 16 MB derived artefact. Without this the deployment would go up
-# with no index and fail at import, so the four files the server reads at runtime are
-# named back in below.
+# Vercel falls back to .gitignore when this file is absent, and the four files the
+# server reads at runtime are gitignored derived artefacts -- so without this the
+# deployment goes up with no index and the function dies at import. That is exactly
+# what the first deploy did.
+#
+# Excluding `data/` and re-including with `!data/index.json` does NOT work: gitignore
+# semantics do not let a file be re-included once a parent directory is excluded, so
+# the negations were silently dead. The big files are named individually instead.
 .git
 ontology/
 tools/
@@ -11,11 +15,20 @@ dist/
 build_pyi/
 .buildenv
 package/
-data/
-!data/index.json
-!data/mined-classified.json
-!data/repairs-classified.json
-!data/resolution-store.json
+
+# the derived bulk: 42 MB + 13 MB + 2 MB that nothing reads at runtime
+data/foodon-asserted.obo.json
+data/foodon-reasoned.obo.json
+data/structure.csv
+data/restrictions.csv
+data/restrictions_nested.csv
+data/holders.csv
+data/orphans.csv
+data/diag.csv
+data/native-axioms.csv
+data/graph-*.json
+data/validation-cache/
+
 __pycache__/
 *.pyc
 .DS_Store
